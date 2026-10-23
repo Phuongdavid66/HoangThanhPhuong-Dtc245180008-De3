@@ -1,0 +1,13 @@
+# Biến môi trường nhạy cảm (Hardening)
+.env
+
+# File hệ thống và công cụ soạn thảo
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.bak
+
+# Log files
+*.log
