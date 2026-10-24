@@ -1,0 +1,5 @@
+[client]
+user=root
+password=YourStrongRootPasswordHere#2026!
+host=db
+port=3306

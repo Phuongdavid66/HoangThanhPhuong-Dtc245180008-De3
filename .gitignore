@@ -1,5 +1,6 @@
 # Biến môi trường nhạy cảm (Hardening)
 .env
+mysqld-exporter/.my.cnf
 
 # File hệ thống và công cụ soạn thảo
 .DS_Store

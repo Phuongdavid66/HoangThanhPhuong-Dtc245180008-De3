@@ -84,6 +84,96 @@ services:
     networks:
       - frontend_net
 
+  # ========================================================
+  # 5. cAdvisor - Giám sát Container (CPU, Memory, IO)
+  # ========================================================
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: wp_cadvisor
+    restart: unless-stopped
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    networks:
+      - monitoring_net
+
+  # ========================================================
+  # 6. Nginx Prometheus Exporter - Giám sát Web Server
+  # ========================================================
+  nginx-exporter:
+    image: nginx/nginx-prometheus-exporter:1.1.0
+    container_name: wp_nginx_exporter
+    restart: unless-stopped
+    depends_on:
+      - nginx
+    command:
+      - -nginx.scrape-uri=http://nginx:8080/stub_status
+    networks:
+      - frontend_net
+      - monitoring_net
+
+  # ========================================================
+  # 7. MySQL Exporter - Giám sát Cơ sở dữ liệu
+  # ========================================================
+  mysqld-exporter:
+    image: prom/mysqld-exporter:latest
+    container_name: wp_mysqld_exporter
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    command:
+      - --config.my-cnf=/.my.cnf
+    volumes:
+      - ./mysqld-exporter/.my.cnf:/.my.cnf:ro
+    networks:
+      - backend_net
+      - monitoring_net
+
+  # ========================================================
+  # 8. Prometheus Server - Thu thập và lưu trữ Metrics
+  # ========================================================
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: wp_prometheus
+    restart: unless-stopped
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    ports:
+      - "9090:9090"
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    networks:
+      - monitoring_net
+
+  # ========================================================
+  # 9. Grafana - Hiển thị Dashboard Giám sát Trực quan
+  # ========================================================
+  grafana:
+    image: grafana/grafana:10.4.1
+    container_name: wp_grafana
+    restart: unless-stopped
+    depends_on:
+      - prometheus
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=Admin_S3cur3d#2026!
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - monitoring_net
+
 # ========================================================
 # Cấu hình Mạng (Network Isolation - Hardening Tiêu chí 6)
 # ========================================================
@@ -92,6 +182,8 @@ networks:
     driver: bridge
   backend_net:
     driver: bridge
+  monitoring_net:
+    driver: bridge
 
 # ========================================================
 # Lưu trữ dữ liệu bền vững (Persistent Volumes)
@@ -99,3 +191,5 @@ networks:
 volumes:
   db_data:
   wp_data:
+  prometheus_data:
+  grafana_data:
