@@ -6,6 +6,8 @@ services:
     image: mysql:8.0
     container_name: wp_mysql
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
       MYSQL_DATABASE: ${MYSQL_DATABASE}
@@ -29,6 +31,8 @@ services:
     image: wordpress:latest
     container_name: wp_app
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       db:
         condition: service_healthy
@@ -54,6 +58,8 @@ services:
     image: phpmyadmin:latest
     container_name: wp_phpmyadmin
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       db:
         condition: service_healthy
@@ -73,6 +79,8 @@ services:
     image: nginx:alpine
     container_name: wp_nginx
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - wordpress
     ports:
@@ -106,6 +114,8 @@ services:
     image: nginx/nginx-prometheus-exporter:1.1.0
     container_name: wp_nginx_exporter
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - nginx
     command:
@@ -121,6 +131,8 @@ services:
     image: prom/mysqld-exporter:latest
     container_name: wp_mysqld_exporter
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       db:
         condition: service_healthy
@@ -139,6 +151,8 @@ services:
     image: prom/prometheus:v2.51.0
     container_name: wp_prometheus
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     volumes:
       - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus_data:/prometheus
@@ -153,14 +167,17 @@ services:
       - monitoring_net
 
   # ========================================================
-  # 9. Grafana - Hiển thị Dashboard Giám sát Trực quan
+  # 9. Grafana - Hiển thị Dashboard & Truy vấn LogQL
   # ========================================================
   grafana:
     image: grafana/grafana:10.4.1
     container_name: wp_grafana
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
     depends_on:
       - prometheus
+      - loki
     ports:
       - "3000:3000"
     environment:
@@ -171,6 +188,41 @@ services:
       - grafana_data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning:ro
       - ./grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - monitoring_net
+
+  # ========================================================
+  # 10. Loki - Hệ thống Lưu trữ Log tập trung
+  # ========================================================
+  loki:
+    image: grafana/loki:2.9.8
+    container_name: wp_loki
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - "3100:3100"
+    volumes:
+      - ./loki/loki-config.yml:/etc/loki/local-config.yaml:ro
+      - loki_data:/loki
+    command: -config.file=/etc/loki/local-config.yaml
+    networks:
+      - monitoring_net
+
+  # ========================================================
+  # 11. Promtail - Thu thập và đẩy Log các Container vào Loki
+  # ========================================================
+  promtail:
+    image: grafana/promtail:2.9.8
+    container_name: wp_promtail
+    restart: unless-stopped
+    depends_on:
+      - loki
+    volumes:
+      - ./promtail/promtail-config.yml:/etc/promtail/config.yml:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+    command: -config.file=/etc/promtail/config.yml
     networks:
       - monitoring_net
 
@@ -193,3 +245,4 @@ volumes:
   wp_data:
   prometheus_data:
   grafana_data:
+  loki_data:

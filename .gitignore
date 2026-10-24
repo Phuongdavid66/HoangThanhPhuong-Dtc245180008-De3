@@ -12,3 +12,8 @@ Thumbs.db
 
 # Log files
 *.log
+
+# File báo cáo Word và script sinh báo cáo
+*.docx
+generate_report.py
+
